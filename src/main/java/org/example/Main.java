@@ -1,9 +1,5 @@
 package org.example;
 
-import io.prometheus.client.Counter;
-import io.prometheus.client.Gauge;
-import io.prometheus.client.Summary;
-
 public class Main {
 
     // Range of random values to be inserted and removed from BST
@@ -15,26 +11,7 @@ public class Main {
 
     //Metrics Defined
     //These metric definitions will go into an aspect, But will not be static in the aspect
-    private static Counter failedAdds = Counter.build()
-            .namespace("java")
-            .name("number_of_failed_adds")
-            .help("Counts the number of failed adds")
-            .register();
-    private static Counter failedRemoves = Counter.build()
-            .namespace("java")
-            .name("number_of_failed_removes")
-            .help("Counts the number of failed removes")
-            .register();
-    private static Gauge numberOfNodes = Gauge.build()
-            .namespace("java")
-            .name("number_of_nodes")
-            .help("Counts Num Nodes")
-            .register();
-    private static Summary insertionTimer = Summary.build()
-            .namespace("java")
-            .name("time_to_add")
-            .help("returns add time")
-            .register();
+    //MOVED TO PrometheusAspect.java
 
 
     /**
@@ -71,26 +48,15 @@ public class Main {
      * @throws InterruptedException if the thread is operating and it is interrupted
      */
     private static void serverOperation() throws InterruptedException {
-        System.out.println("In serverOperation()");
         // Two random values to insert or remove from the BST are selected
         int randomAdd = randomNumber();
         int randomRemove = randomNumber();
 
-        Summary.Timer timer = insertionTimer.startTimer();
-        if(tree.add(randomAdd)){
-            numberOfNodes.inc();
-        }else{
-            failedAdds.inc();
-        }
-        timer.observeDuration();
+        tree.add(randomAdd);
 
-
-        try{
+        try {
             tree.remove(randomRemove);
-            numberOfNodes.dec();
-        }catch (FailedRemoveException e){
-            failedRemoves.inc();
-        }
+        } catch (FailedRemoveException e) { }
 
         // The server waits for 1000 milliseconds
         Thread.sleep(1000);
@@ -111,6 +77,4 @@ public class Main {
     private static int randomNumber() {
         return (int)(Math.random() * ((MAX_VALUE - MIN_VALUE) + 1)) + MIN_VALUE;
     }
-
-
 }

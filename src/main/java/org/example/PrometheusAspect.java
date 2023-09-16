@@ -1,10 +1,10 @@
 package org.example;
 
+import io.prometheus.client.Gauge;
+import io.prometheus.client.Summary;
 import org.aspectj.lang.JoinPoint;
-import org.aspectj.lang.annotation.After;
-import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Before;
-import org.aspectj.lang.annotation.Pointcut;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.*;
 
 import io.prometheus.client.Counter;
 import io.prometheus.client.exporter.HTTPServer;
@@ -23,8 +23,30 @@ public class PrometheusAspect {
         .help("Counts the number of attempted inserts and removes")
         .register();
 
-  //Add your other Prometheus Metrics here
+  //New Prometheus Metrics
+  private static Counter failedAdds = Counter.build()
+          .namespace("java")
+          .name("number_of_failed_adds")
+          .help("Counts the number of failed adds")
+          .register();
 
+    private static Counter failedRemoves = Counter.build()
+            .namespace("java")
+            .name("number_of_failed_removes")
+            .help("Counts the number of failed removes")
+            .register();
+
+    private static Gauge numberOfNodes = Gauge.build()
+            .namespace("java")
+            .name("number_of_nodes")
+            .help("Counts Num Nodes")
+            .register();
+
+    private static Summary insertionTimer = Summary.build()
+            .namespace("java")
+            .name("time_to_add")
+            .help("returns add time")
+            .register();
 
   /**
    * This pointcut targets the serverOperation method in the Main package
@@ -38,7 +60,12 @@ public class PrometheusAspect {
   @Pointcut("execution(* org.example.Main.startThread(..))")
   public void startThreadPointcut(){}
 
-  //Add your other pointcut definitions here
+  //New pointcut definitions
+  @Pointcut("execution(public T org.example.BST.remove(T))")
+  public void removeNodePointcut(){}
+
+    @Pointcut("execution(public boolean org.example.BST.add(T))")
+    public void addNodePointcut(){}
 
   /**
    * This After Advice tells the numberOfIterations to increment after the serverOperation finishes
@@ -46,10 +73,8 @@ public class PrometheusAspect {
    */
   @After("serverOperationExecution()")
   public void afterServerOperation(JoinPoint joinPoint) {
-      System.out.println("From aspect: increasing numberOfIterations");
       numberOfIterations.inc();
   }
-
 
   /**
    * Starts the Prometheus Exporter Server
@@ -58,7 +83,6 @@ public class PrometheusAspect {
    */
   @Before("startThreadPointcut()")
   public void afterThreadInitialization(JoinPoint joinPoint) {
-      System.out.println("Starting server!");
     final int SERVER_PORT = 8080;
           try {
             HTTPServer server = new HTTPServer(SERVER_PORT);
@@ -67,12 +91,33 @@ public class PrometheusAspect {
             System.out.println("Prometheus exporter was unable to start");
             e.printStackTrace();
         }
-
   }
 
+  // New advices
+  @Around("removeNodePointcut()")
+  public Object aroundBSTRemove(ProceedingJoinPoint joinPoint) throws Throwable {
+      try {
+          joinPoint.proceed();
+          numberOfNodes.dec();
+      } catch (FailedRemoveException e) {
+          failedRemoves.inc();
+      }
 
+      return null;
+  }
 
-  //Add your other Advices here
+  @Around("addNodePointcut()")
+  public Object aroundBSTAdd(ProceedingJoinPoint joinPoint) throws Throwable {
+      Summary.Timer timer = insertionTimer.startTimer();
+      Object returnObject = joinPoint.proceed();
+      timer.observeDuration();
 
+      if ((boolean)returnObject) {
+          numberOfNodes.inc();
+      } else {
+          failedAdds.inc();
+      }
 
+      return null;
+  }
 }

@@ -17,6 +17,11 @@ public class BST<T extends Comparable<? super T>>  {
         this.size = 0;
     }
 
+    // DELETEME
+    public void printSomething() {
+        System.out.println("in BST.java");
+    }
+
     /**
      * Initializes the BST with the data in the Collection. The data in the BST
      * should be added in the same order it is in the Collection.
